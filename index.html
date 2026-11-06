@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Trova il tuo metodo di studio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: una colonna stretta di schede, dal questionario al registro */
+  :root { --bg:#f5f7fb; --card:#ffffff; --primary:#3b6fd8; --text:#1d2433; --muted:#6b7280; --ok:#2e9e5b;
+          --line:#d6dbe6; --line-soft:#eef0f5; --sel:#eef3fd; --tipbg:#f0faf4; --disabled:#aab4c8; --onprimary:#ffffff; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#12161f; --card:#1b2130; --primary:#6b95ee; --text:#e6eaf2; --muted:#9aa3b5; --ok:#4cc584;
+    --line:#2f3850; --line-soft:#262d3f; --sel:#22304f; --tipbg:#17291f; --disabled:#3d4659; --onprimary:#0f1422; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg:#12161f; --card:#1b2130; --primary:#6b95ee; --text:#e6eaf2; --muted:#9aa3b5; --ok:#4cc584;
+    --line:#2f3850; --line-soft:#262d3f; --sel:#22304f; --tipbg:#17291f; --disabled:#3d4659; --onprimary:#0f1422; color-scheme: dark }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size:16px; background:var(--bg); color:var(--text); line-height:1.5; }
+  main { max-width: 640px; margin: 0 auto; padding-block: 20px 40px;
+         padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { font-size: 1.5rem; margin: 8px 0 4px; text-wrap: balance; }
+  h2 { font-size: 1.15rem; margin: 0 0 12px; text-wrap: balance; }
+  .card { background:var(--card); border-radius:14px; padding:20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  .muted { color:var(--muted); font-size:.95rem; }
+  .opt { display:block; width:100%; text-align:left; padding:12px 14px; margin:8px 0; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--text); font-size:1rem; cursor:pointer; }
+  .opt.sel { border-color:var(--primary); background:var(--sel); }
+  .opt:focus-visible, button.main:focus-visible, input:focus-visible, textarea:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+  button.main { background:var(--primary); color:var(--onprimary); border:none; border-radius:10px; padding:12px 18px; font-size:1rem; cursor:pointer; margin-top:8px; }
+  button.main:disabled { background:var(--disabled); cursor:default; }
+  .step { font-size:.85rem; color:var(--muted); margin-bottom:8px; }
+  .tip { border-left:4px solid var(--ok); padding:8px 12px; background:var(--tipbg); border-radius:6px; margin:10px 0; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  input, textarea { width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; font-size:1rem; font-family:inherit; background:var(--card); color:var(--text); }
+  textarea { min-height:70px; }
+  .log { border-top:1px solid var(--line-soft); padding:10px 0; }
+  .prio { display:inline-block; font-size:.75rem; letter-spacing:.04em; text-transform:uppercase; padding:1px 8px; border-radius:99px; margin-left:6px; border:1px solid var(--line); color:var(--muted); }
+  .prio.alta { border-color:var(--primary); color:var(--primary); }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+
+<main>
+  <h1>Trova il tuo metodo di studio</h1>
+  <p class="muted">Rispondi a qualche domanda e ti propongo un modo di studiare che si adatta a te.</p>
+
+  <section id="quiz" class="card">
+    <div class="step" id="stepLabel"></div>
+    <h2 id="question"></h2>
+    <div id="options"></div>
+    <div class="row">
+      <button class="main" id="nextBtn" disabled>Avanti</button>
+    </div>
+  </section>
+
+  <section id="result" class="card hidden">
+    <h2>Il tuo metodo consigliato</h2>
+    <div id="resultBody"></div>
+    <div class="row">
+      <button class="main" id="restartBtn">Rifai il questionario</button>
+    </div>
+  </section>
+
+  <section id="materie" class="card hidden">
+    <h2>Materie da seguire</h2>
+    <p class="muted">Parti dalle materie con priorità alta, poi passa alle altre.</p>
+    <div id="materieList"></div>
+  </section>
+
+  <section id="log" class="card hidden">
+    <h2>Registro delle sessioni di studio</h2>
+    <p class="muted">Annota cosa hai studiato e come ti sei sentito. Dopo qualche settimana vedrai i progressi. Il registro resta salvato solo su questo dispositivo.</p>
+    <datalist id="materieSuggest"></datalist>
+    <input id="logSubject" list="materieSuggest" placeholder="Materia (es. inglese)">
+    <div style="height:8px"></div>
+    <textarea id="logNote" placeholder="Cosa hai fatto e come ti sei sentito"></textarea>
+    <div class="row">
+      <button class="main" id="addLogBtn">Aggiungi</button>
+    </div>
+    <div id="logList"></div>
+  </section>
+</main>
+
+<script>
+const questions = [
+  { q: "Come impari meglio?", opts: [
+      { t: "Leggendo e guardando schemi", k: "visivo" },
+      { t: "Ascoltando e parlando ad alta voce", k: "uditivo" },
+      { t: "Facendo esercizi e provando da solo", k: "pratico" } ] },
+  { q: "Quanto tempo riesci a stare concentrato di seguito?", opts: [
+      { t: "Pochi minuti (5-10)", k: "breve" },
+      { t: "Circa 15-25 minuti", k: "medio" },
+      { t: "Più di 30 minuti", k: "lungo" } ] },
+  { q: "Qual è la cosa più difficile quando studi?", opts: [
+      { t: "Iniziare", k: "iniziare" },
+      { t: "Ricordare quello che ho letto", k: "memoria" },
+      { t: "Capire i concetti", k: "capire" } ] },
+  { q: "Cosa ti distrae di più?", opts: [
+      { t: "Telefono e notifiche", k: "telefono" },
+      { t: "Rumore o persone intorno", k: "rumore" },
+      { t: "Non mi distraggo quasi mai", k: "nessuna" } ] }
+];
+
+const methods = {
+  breve: { name: "Blocchi brevi", desc: "Studia per 10 minuti, poi fai una pausa di 3. Ripeti 3-4 volte." },
+  medio: { name: "Tecnica Pomodoro", desc: "25 minuti di studio, 5 di pausa. Dopo 4 blocchi, una pausa più lunga." },
+  lungo: { name: "Blocchi lunghi con obiettivo", desc: "Scegli un obiettivo chiaro per la sessione, poi studia fino a raggiungerlo." }
+};
+
+const tips = {
+  visivo: "Usa schemi, mappe concettuali e colori per organizzare gli argomenti.",
+  uditivo: "Ripeti ad alta voce quello che hai studiato, come se lo spiegassi a qualcuno.",
+  pratico: "Dopo ogni argomento fai subito 3-5 esercizi senza guardare la teoria.",
+  memoria: "Prima di riaprire il libro, prova a ricordare da solo quello che hai letto (richiamo attivo).",
+  capire: "Spiega l'argomento con parole tue come se lo insegnassi a un compagno più piccolo.",
+  iniziare: "Inizia sempre con un compito piccolo e facile (2 minuti). Di solito l'inizio è la parte più dura.",
+  telefono: "Metti il telefono in un'altra stanza per tutta la durata del blocco di studio.",
+  rumore: "Studia in un posto tranquillo, magari con cuffie e musica senza parole.",
+  nessuna: "Ottimo: puoi allungare i blocchi di studio quando ti senti pronto."
+};
+
+const materie = [
+  { nome: "Inglese", priorita: "alta", consiglio: "Ripeti frasi ad alta voce e prova a parlare senza guardare il testo (richiamo attivo orale)." },
+  { nome: "Geografia", priorita: "alta", consiglio: "Disegna mappe e schemi a mano, poi ripassa a intervalli: oggi, tra 3 giorni, tra una settimana." },
+  { nome: "Storia", priorita: "media", consiglio: "Crea una linea del tempo e spiega ogni evento con parole tue, senza il libro." },
+  { nome: "Matematica", priorita: "media", consiglio: "Fai esercizi pratici subito dopo la teoria, partendo dai più semplici." },
+  { nome: "Musica", priorita: "media", consiglio: "Ripeti i concetti ad alta voce e ascolta gli esempi più volte." },
+  { nome: "Francese", priorita: "bassa", consiglio: "Mantieni il ritmo con brevi ripassi di vocaboli ogni giorno." },
+  { nome: "Tecnologia", priorita: "bassa", consiglio: "Rifai i disegni o i calcoli da solo per fissare il procedimento." },
+  { nome: "Educazione fisica", priorita: "bassa", consiglio: "Non serve un metodo specifico: mantieni l'impegno che già metti." },
+  { nome: "Arte e immagine", priorita: "bassa", consiglio: "Non serve un metodo specifico: mantieni l'impegno che già metti." }
+];
+
+function renderMaterie() {
+  const box = document.getElementById("materieList");
+  box.innerHTML = "";
+  materie.forEach(m => {
+    const d = document.createElement("div");
+    d.className = "log";
+    const strong = document.createElement("strong");
+    strong.textContent = m.nome;
+    const pr = document.createElement("span");
+    pr.className = "prio " + m.priorita;
+    pr.textContent = "priorità " + m.priorita;
+    const p = document.createElement("div");
+    p.textContent = m.consiglio;
+    d.append(strong, pr, p);
+    box.appendChild(d);
+  });
+  const list = document.getElementById("materieSuggest");
+  list.innerHTML = "";
+  materie.forEach(m => { const o = document.createElement("option"); o.value = m.nome; list.appendChild(o); });
+}
+
+let current = 0;
+const answers = [];
+
+function showQuestion() {
+  const item = questions[current];
+  document.getElementById("stepLabel").textContent = `Domanda ${current + 1} di ${questions.length}`;
+  document.getElementById("question").textContent = item.q;
+  const box = document.getElementById("options");
+  box.innerHTML = "";
+  const next = document.getElementById("nextBtn");
+  next.disabled = true;
+  next.textContent = current === questions.length - 1 ? "Vedi il risultato" : "Avanti";
+  item.opts.forEach(opt => {
+    const b = document.createElement("button");
+    b.className = "opt";
+    b.textContent = opt.t;
+    b.onclick = () => {
+      box.querySelectorAll(".opt").forEach(x => x.classList.remove("sel"));
+      b.classList.add("sel");
+      answers[current] = opt;
+      next.disabled = false;
+    };
+    box.appendChild(b);
+  });
+}
+
+document.getElementById("nextBtn").onclick = () => {
+  current++;
+  if (current < questions.length) showQuestion(); else showResult();
+};
+
+function showResult() {
+  ["quiz"].forEach(id => document.getElementById(id).classList.add("hidden"));
+  ["result", "materie", "log"].forEach(id => document.getElementById(id).classList.remove("hidden"));
+  renderMaterie();
+
+  const m = methods[answers[1].k];
+  const body = document.getElementById("resultBody");
+  body.innerHTML = "";
+
+  const h = document.createElement("p");
+  const s = document.createElement("strong");
+  s.textContent = m.name;
+  h.append(s, document.createElement("br"), m.desc);
+  body.appendChild(h);
+
+  const title = document.createElement("p");
+  title.innerHTML = "<strong>Consigli in base alle tue risposte:</strong>";
+  body.appendChild(title);
+
+  [answers[0].k, answers[2].k, answers[3].k].forEach(k => {
+    const t = document.createElement("div");
+    t.className = "tip";
+    t.textContent = tips[k];
+    body.appendChild(t);
+  });
+
+  const note = document.createElement("p");
+  note.className = "muted";
+  note.textContent = "Consiglio: prova questo metodo per due settimane, poi rifai il questionario e confronta.";
+  body.appendChild(note);
+
+  renderLog();
+}
+
+document.getElementById("restartBtn").onclick = () => {
+  current = 0;
+  answers.length = 0;
+  document.getElementById("result").classList.add("hidden");
+  document.getElementById("quiz").classList.remove("hidden");
+  showQuestion();
+  document.getElementById("quiz").scrollIntoView({ behavior: "smooth" });
+};
+
+function loadLog() {
+  try { return JSON.parse(localStorage.getItem("studioLog") || "[]"); } catch (e) { return []; }
+}
+function saveLog(list) {
+  try { localStorage.setItem("studioLog", JSON.stringify(list)); } catch (e) {}
+}
+
+function renderLog() {
+  const list = loadLog();
+  const box = document.getElementById("logList");
+  box.innerHTML = "";
+  list.slice().reverse().forEach(entry => {
+    const d = document.createElement("div");
+    d.className = "log";
+    const s = document.createElement("strong");
+    s.textContent = `${entry.date} · ${entry.subject}`;
+    const n = document.createElement("div");
+    n.textContent = entry.note;
+    d.append(s, n);
+    box.appendChild(d);
+  });
+}
+
+document.getElementById("addLogBtn").onclick = () => {
+  const subject = document.getElementById("logSubject").value.trim();
+  const note = document.getElementById("logNote").value.trim();
+  if (!subject) { document.getElementById("logSubject").focus(); return; }
+  const list = loadLog();
+  list.push({ date: new Date().toLocaleDateString("it-IT"), subject, note });
+  saveLog(list);
+  document.getElementById("logSubject").value = "";
+  document.getElementById("logNote").value = "";
+  renderLog();
+};
+
+showQuestion();
+renderLog();
+</script>
+</body>
+</html>
